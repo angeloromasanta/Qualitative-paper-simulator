@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
-// 1. Fixed ReactMarkdown import and usage to avoid className prop error
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 // Firebase configuration
@@ -26,7 +25,8 @@ function App() {
   // State for research question and model
   const [researchQuestion, setResearchQuestion] = useState("How do users unstuck LLMs.");
   const [model, setModel] = useState("gpt-4o-mini");
-  
+  const [tempTranscriptContent, setTempTranscriptContent] = useState("");
+
   // State for study design
   const [showStudyDesign, setShowStudyDesign] = useState(false);
   const [setting, setSetting] = useState("");
@@ -130,6 +130,10 @@ function App() {
       case "transcripts":
         setTranscripts("");
         break;
+        // In the switch statement where you update state during streaming
+case "transcripts_temp":
+  setTempTranscriptContent(result);
+  break;
       case "analysisData":
         setAnalysisData("");
         break;
@@ -313,8 +317,8 @@ function App() {
     setIsLoading(true);
     setShowStudyDesign(true); // Show section immediately to provide a place for streaming content
     
-    const settingPrompt = `You are a qualitative research expert. Generate a potential research setting for the following research question: "${researchQuestion}". Keep it concise (2-3 paragraphs).`;
-    const theoryPrompt = `You are a qualitative research expert. Suggest a theoretical framework that would be appropriate for the following research question: "${researchQuestion}". Explain why this framework is suitable and how it can be applied. Keep it concise (2-3 paragraphs).`;
+    const settingPrompt = `You are a qualitative research expert. Generate a potential research setting for the following research question: "${researchQuestion}". Keep it concise (1 sentence).`;
+    const theoryPrompt = `You are a qualitative research expert. Suggest a theoretical framework that would be appropriate for the following research question: "${researchQuestion}". Just put the name of the theory and a 1 sentence explanation why it is suitable.`;
     
     try {
       await Promise.all([
@@ -339,7 +343,7 @@ function App() {
     - Theoretical framework: "${theory}"
     - Additional notes: "${otherNotes}"
     
-    Format the questions as a numbered list. Each question should be designed to elicit rich, detailed responses.`;
+    Format the questions as a numbered list. Each question should be designed to elicit rich, detailed responses. Directly send the questions, no intro needed.`;
     
     const personasPrompt = `You are a qualitative research expert. Generate ${numInterviewees} diverse personas for interviewees for a study with the following details:
     - Research question: "${researchQuestion}"
@@ -352,7 +356,7 @@ function App() {
     - Brief background relevant to the research topic
     - Level of experience with the research topic
     
-    Format as a numbered list with clear separation between personas.`;
+    Format as a numbered list with clear separation between personas. Directly send the personas, no intro needed.`;
     
     try {
       await Promise.all([
@@ -366,30 +370,62 @@ function App() {
     }
   };
 
-  // Conduct interviews - one per persona
   const conductInterviews = async () => {
     setIsLoading(true);
-    setShowInterviews(true); // Show section immediately for streaming
+    setShowInterviews(true);
     
-    // Create an improved prompt that encourages one transcript per persona
-    const interviewPrompt = `You are a qualitative research expert. Generate realistic interview transcripts for a study with the following details:
-    - Research question: "${researchQuestion}"
-    - Interview questions: "${questions}"
-    - Interviewees: "${personas}"
-    
-    IMPORTANT: You must create exactly ${numInterviewees} individual interview transcripts, ONE FOR EACH persona from the list of personas.
-    For EACH persona, create a SEPARATE interview transcript. Each transcript should:
-    - Begin with "Interview with [Persona Name]:"
-    - Include the interviewee's name and basic information
-    - Include the interviewer's questions and the interviewee's responses
-    - Show realistic hesitations, tangents, and depth in responses
-    - Reflect the unique perspective of each persona
-    - Be between 300-500 words per interview
-    
-    Format with clear separation between interviews. Number each interview clearly. MAKE SURE you create exactly one transcript PER persona from the personas list.`;
+    // Initialize empty transcripts
+    setTranscripts("");
+    let allTranscripts = "";
+    let currentTranscripts = [];
     
     try {
-      await callOpenRouterWithStreaming(interviewPrompt, model, "transcripts");
+      // Process one persona at a time
+      for (let i = 0; i < parsedPersonas.length; i++) {
+        // Extract the persona name and details
+        const persona = parsedPersonas[i];
+        const personaName = persona.split('\n')[0];
+        
+        // Create a specific prompt for this persona
+        const singleInterviewPrompt = `You are the following persona:
+  
+  ${persona}
+  
+  Please respond to the following interview questions from your perspective as this persona.
+  Use first person ("I") in your responses and maintain the characteristics, background, and expertise level described above.
+  
+  Here are the interview questions:
+  ${questions}
+  
+  Your response should be natural, conversational, and show your unique perspective based on your background. Include some hesitations, specific examples from your experience, and occasional tangents when appropriate.`;
+  
+        // Update UI to show which persona is being interviewed
+        setTranscripts(prev => 
+          prev + `\nInterviewing ${personaName} (${i+1}/${parsedPersonas.length})...\n`
+        );
+        
+        // Generate the interview for this specific persona
+        const response = await callOpenRouterWithStreaming(
+          singleInterviewPrompt, 
+          model, 
+          "transcripts_temp"  // Use a temporary target that won't be displayed directly
+        );
+        
+        // Format the complete interview
+        const formattedInterview = `Interview with ${personaName}:\n\nInterviewer: Thank you for participating in this study about "${researchQuestion}". Let's begin with the first question.\n\n${response}`;
+        
+        // Add to our collection
+        currentTranscripts.push(formattedInterview);
+        
+        // Update the complete transcripts
+        allTranscripts += (i > 0 ? "\n\n" : "") + formattedInterview;
+        setTranscripts(allTranscripts);
+      }
+      
+      // Set final transcripts
+      setTranscripts(allTranscripts);
+      setParsedTranscripts(currentTranscripts);
+      
     } catch (error) {
       console.error("Error conducting interviews:", error);
     } finally {
