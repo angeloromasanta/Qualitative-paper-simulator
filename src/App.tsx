@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, getDoc, doc, setDoc, updateDoc  } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, getDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -33,7 +33,7 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const navigate = useNavigate();
-const { id } = useParams();
+  const { id } = useParams();
   // State for study design
   const [showStudyDesign, setShowStudyDesign] = useState(false);
   const [setting, setSetting] = useState("");
@@ -99,10 +99,10 @@ const { id } = useParams();
         try {
           const paperRef = doc(db, "research-studies", id);
           const paperDoc = await getDoc(paperRef);
-          
+
           if (paperDoc.exists()) {
             const paperData = paperDoc.data();
-            
+
             // Set all the state variables from the loaded paper
             setResearchQuestion(paperData.researchQuestion || "");
             setModel(paperData.model || "gpt-4o-mini");
@@ -114,14 +114,14 @@ const { id } = useParams();
             setAnalysisData(paperData.analysisData || "");
             setFinalStudy(paperData.finalStudy || "");
             setPaperId(id);
-  
+
             // Update display states
             setShowStudyDesign(!!paperData.setting || !!paperData.theory);
             setShowInterviewProtocol(!!paperData.questions || !!paperData.personas);
             setShowInterviews(!!paperData.transcripts);
             setShowAnalysis(!!paperData.analysisData);
             setShowStudy(!!paperData.finalStudy);
-  
+
             // Process the personas and transcripts
             if (paperData.personas) {
               const individualPersonas = paperData.personas.split(/^\d+\.|\n\d+\.|\n\d+\)/)
@@ -129,7 +129,7 @@ const { id } = useParams();
                 .map(text => text.trim());
               setParsedPersonas(individualPersonas);
             }
-  
+
             if (paperData.transcripts) {
               processTranscripts(paperData.transcripts);
             }
@@ -142,7 +142,7 @@ const { id } = useParams();
         }
       }
     };
-  
+
     loadPaperById();
   }, [id]);
 
@@ -169,11 +169,11 @@ const { id } = useParams();
     loadPreviousPapers();
   }, []);
 
-  
+
   const generatePaperId = () => {
     return nanoid(10); // Creates a 10-character unique ID
   };
-  
+
 
   const callOpenRouterWithStreaming = async (prompt, model, targetField) => {
     setIsStreaming(true);
@@ -384,12 +384,12 @@ const { id } = useParams();
   const generateStudyDesign = async () => {
     setIsLoading(true);
     setShowStudyDesign(true);
-  
+
     // Generate a unique ID for this paper if one doesn't exist yet
     if (!paperId) {
       const newPaperId = generatePaperId();
       setPaperId(newPaperId);
-      
+
       // Create an initial document in Firestore
       try {
         await setDoc(doc(db, "research-studies", newPaperId), {
@@ -399,23 +399,23 @@ const { id } = useParams();
           created: new Date(),
           lastModified: new Date()
         });
-        
+
         // Update the URL without reloading the page
         navigate(`/paper/${newPaperId}`, { replace: true });
       } catch (error) {
         console.error("Error creating initial paper:", error);
       }
     }
-  
+
     const settingPrompt = `You are a qualitative research expert. Generate a potential research setting for the following research question: "${researchQuestion}". Keep it concise (1 sentence).`;
     const theoryPrompt = `You are a qualitative research expert. Suggest a theoretical framework that would be appropriate for the following research question: "${researchQuestion}". Just put the name of the theory and a 1 sentence explanation why it is suitable.`;
-  
+
     try {
       await Promise.all([
         callOpenRouterWithStreaming(settingPrompt, model, "setting"),
         callOpenRouterWithStreaming(theoryPrompt, model, "theory")
       ]);
-      
+
       // Auto-save after generating study design
       if (paperId) {
         await updateDoc(doc(db, "research-studies", paperId), {
@@ -438,10 +438,10 @@ const { id } = useParams();
       setPaperId(newPaperId);
       navigate(`/paper/${newPaperId}`, { replace: true });
     }
-    
+
     setIsSaving(true);
     setSaveMessage("");
-    
+
     try {
       const paperData = {
         researchQuestion,
@@ -455,11 +455,11 @@ const { id } = useParams();
         finalStudy,
         lastModified: new Date()
       };
-      
+
       // Check if this is a new paper
       const paperRef = doc(db, "research-studies", paperId);
       const paperDoc = await getDoc(paperRef);
-      
+
       if (paperDoc.exists()) {
         // Update existing paper
         await updateDoc(paperRef, paperData);
@@ -469,26 +469,26 @@ const { id } = useParams();
         paperData.timestamp = new Date();
         await setDoc(paperRef, paperData);
       }
-      
+
       setSaveMessage("Paper saved successfully!");
-      
+
       // Refresh the list of previous papers
       const papersRef = collection(db, "research-studies");
       const q = query(papersRef, orderBy("timestamp", "desc"));
       const querySnapshot = await getDocs(q);
-  
+
       const papers = [];
       querySnapshot.forEach((doc) => {
         papers.push({ id: doc.id, ...doc.data() });
       });
-  
+
       setPreviousPapers(papers);
     } catch (error) {
       console.error("Error saving paper:", error);
       setSaveMessage("Error saving paper. Please try again.");
     } finally {
       setIsSaving(false);
-      
+
       // Clear the save message after a few seconds
       setTimeout(() => {
         setSaveMessage("");
@@ -537,18 +537,18 @@ const { id } = useParams();
   const conductInterviews = async () => {
     setIsLoading(true);
     setShowInterviews(true);
-  
+
     // Initialize state to hold transcripts
     setTranscripts("");
     setParsedTranscripts(Array(parsedPersonas.length).fill(""));
-  
+
     try {
       // Create a copy of parsedPersonas for local reference
       const personasCopy = [...parsedPersonas];
-      
+
       // Create an array to track streaming updates
       const updateStreams = [];
-      
+
       // Function to update a specific transcript
       const updateTranscript = (index, content) => {
         setParsedTranscripts(prev => {
@@ -557,18 +557,18 @@ const { id } = useParams();
           return updated;
         });
       };
-      
+
       // Process up to 5 personas at a time
       for (let batch = 0; batch < Math.ceil(personasCopy.length / 5); batch++) {
         const startIdx = batch * 5;
         const endIdx = Math.min(startIdx + 5, personasCopy.length);
         const batchPersonas = personasCopy.slice(startIdx, endIdx);
-        
+
         // Start streaming for all personas in this batch
         const batchPromises = batchPersonas.map((persona, batchIndex) => {
           const globalIndex = startIdx + batchIndex;
           const personaName = persona.split('\n')[0];
-          
+
           // Create the interview prompt
           const singleInterviewPrompt = `You are the following persona:
           
@@ -578,13 +578,13 @@ const { id } = useParams();
   ${questions}
           
   Your response should be natural, conversational, and show your unique perspective based on your background. Include some hesitations, specific examples from your experience, and occasional tangents when appropriate.`;
-          
+
           // Update UI to show which personas are being interviewed
           updateTranscript(
-            globalIndex, 
+            globalIndex,
             `Interview with ${personaName}\n\nInterviewer: Thank you for participating in this study about "${researchQuestion}". Let's begin with the first question.\n\nInterviewee: [Interview in progress...]`
           );
-          
+
           // Custom streaming handler for each persona
           return new Promise(async (resolve) => {
             try {
@@ -603,24 +603,24 @@ const { id } = useParams();
                   stream: true,
                 }),
               });
-              
+
               // Set up streaming
               const reader = response.body.getReader();
               const decoder = new TextDecoder("utf-8");
               let transcript = `Interview with ${personaName}:\n\nInterviewer: Thank you for participating in this study about "${researchQuestion}". Let's begin with the first question.\n\n`;
-              
+
               while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                
+
                 const chunk = decoder.decode(value);
                 const lines = chunk.split("\n").filter(line => line.trim() !== "");
-                
+
                 for (const line of lines) {
                   if (line.startsWith("data: ")) {
                     const data = line.substring(6);
                     if (data === "[DONE]") continue;
-                    
+
                     try {
                       const parsed = JSON.parse(data);
                       const content = parsed.choices[0]?.delta?.content || "";
@@ -634,30 +634,30 @@ const { id } = useParams();
                   }
                 }
               }
-              
+
               // When done, update the final transcript
               updateTranscript(globalIndex, transcript);
               resolve(transcript);
             } catch (error) {
               console.error(`Error conducting interview for persona ${globalIndex}:`, error);
               updateTranscript(
-                globalIndex, 
+                globalIndex,
                 `Interview with ${personaName}\n\nInterviewer: Thank you for participating in this study about "${researchQuestion}".\n\n[Error: Could not complete interview]`
               );
               resolve("");
             }
           });
         });
-        
+
         // Wait for the current batch to finish before starting the next batch
         // This limits to 5 concurrent interviews
         await Promise.all(batchPromises);
       }
-      
+
       // Combine all transcripts for the full transcript display
       const fullTranscript = parsedTranscripts.join("\n\n");
       setTranscripts(fullTranscript);
-      
+
     } catch (error) {
       console.error("Error conducting interviews:", error);
     } finally {
@@ -680,7 +680,7 @@ const { id } = useParams();
   const conductAnalysis = async () => {
     setIsLoading(true);
     setShowAnalysis(true); // Show section immediately for streaming
-  
+
     // Use JSON.stringify to ensure the full transcript text is included in the prompt
     const analysisPrompt = `You are a qualitative research expert. Conduct a grounded theory analysis of the following interview transcripts:
     ${JSON.stringify(transcripts)}
@@ -694,7 +694,7 @@ const { id } = useParams();
     3. Aggregate dimensions: Identify 2-3 high-level aggregate dimensions that emerge from the second-order themes. Explain how these connect to the research question: "${researchQuestion}".
     
     Include a visual representation of this coding structure as a three-column Markdown table with First-order codes in column 1, Second-order themes in column 2, and Aggregate dimensions in column 3. Make sure your first-order codes are properly aligned with their second-order themes, and second-order themes are properly aligned with their aggregate dimensions.`;
-  
+
     try {
       await callOpenRouterWithStreaming(analysisPrompt, model, "analysisData");
     } catch (error) {
@@ -894,9 +894,8 @@ const { id } = useParams();
         <button
           onClick={savePaper}
           disabled={isSaving}
-          className={`py-2 px-6 rounded-md font-medium text-white shadow-md transition-colors flex items-center ${
-            isSaving ? 'bg-slate-400' : 'bg-slate-800 hover:bg-slate-700'
-          }`}
+          className={`py-2 px-6 rounded-md font-medium text-white shadow-md transition-colors flex items-center ${isSaving ? 'bg-slate-400' : 'bg-slate-800 hover:bg-slate-700'
+            }`}
         >
           {isSaving ? (
             <>
@@ -923,7 +922,7 @@ const { id } = useParams();
       </div>
     );
   };
-  
+
 
 
   // 3. Updated with Elsevier-inspired styling
@@ -933,13 +932,13 @@ const { id } = useParams();
 
       {/* 3. Elsevier-inspired header */}
       <header className="bg-slate-800 text-white py-4 border-b border-slate-700">
-        <div className="max-w-6xl mx-auto px-4 flex justify-between items-center">
-          <h1 className="text-2xl font-serif">Qualitative Research Paper Simulator</h1>
-          <div className="text-sm">
-            <span className="opacity-75">Made by</span> Angelo
-          </div>
-        </div>
-      </header>
+  <div className="max-w-6xl mx-auto px-4 flex justify-between items-center">
+    <h1 className="text-2xl font-serif">Qualitative Research Paper Simulator</h1>
+    <div className="text-sm">
+      <span className="opacity-75">Made by</span> Angelo
+    </div>
+  </div>
+</header>
 
       <div className={`px-4 py-8 ${!showStudyDesign ? 'min-h-screen flex flex-col items-center justify-center' : ''}`}>
         {/* Initial inputs - centered when alone */}
@@ -981,8 +980,8 @@ const { id } = useParams();
             onClick={generateStudyDesign}
             disabled={isLoading || isStreaming}
             className={`w-full py-2 px-4 rounded-md font-medium text-white transition-colors ${isLoading || isStreaming
-                ? 'bg-slate-400'
-                : 'bg-slate-800 hover:bg-slate-700'
+              ? 'bg-slate-400'
+              : 'bg-slate-800 hover:bg-slate-700'
               }`}
           >
             {isLoading && !showStudyDesign ? (
@@ -1126,8 +1125,8 @@ const { id } = useParams();
                 onClick={generateInterviewProtocol}
                 disabled={isLoading || isStreaming}
                 className={`py-2 px-6 rounded-md font-medium text-white transition-colors ${isLoading || isStreaming
-                    ? 'bg-slate-400'
-                    : 'bg-slate-800 hover:bg-slate-700'
+                  ? 'bg-slate-400'
+                  : 'bg-slate-800 hover:bg-slate-700'
                   }`}
               >
                 {isLoading && !showInterviewProtocol ? "Generating..." : "Generate Interview Protocol"}
@@ -1201,7 +1200,7 @@ const { id } = useParams();
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {isStreaming && streamTarget === "personas" ? (
                     <div className="col-span-full bg-gray-50 p-4 rounded-md">
                       <div className="prose max-w-none">
@@ -1227,8 +1226,8 @@ const { id } = useParams();
                 onClick={conductInterviews}
                 disabled={isLoading || isStreaming}
                 className={`py-2 px-6 rounded-md font-medium text-white transition-colors ${isLoading || isStreaming
-                    ? 'bg-slate-400'
-                    : 'bg-slate-800 hover:bg-slate-700'
+                  ? 'bg-slate-400'
+                  : 'bg-slate-800 hover:bg-slate-700'
                   }`}
               >
                 {isLoading && !showInterviews ? "Conducting..." : "Conduct Interviews"}
@@ -1264,7 +1263,7 @@ const { id } = useParams();
               </div>
             ) : (
               <div className="mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {isStreaming && streamTarget === "transcripts" ? (
                     <div className="col-span-full bg-gray-50 p-4 rounded-md">
                       <div className="prose max-w-none">
@@ -1297,8 +1296,8 @@ const { id } = useParams();
                 onClick={conductAnalysis}
                 disabled={isLoading || isStreaming}
                 className={`py-2 px-6 rounded-md font-medium text-white transition-colors ${isLoading || isStreaming
-                    ? 'bg-slate-400'
-                    : 'bg-slate-800 hover:bg-slate-700'
+                  ? 'bg-slate-400'
+                  : 'bg-slate-800 hover:bg-slate-700'
                   }`}
               >
                 {isLoading && !showAnalysis ? "Analyzing..." : "Conduct Qualitative Text Analysis"}
@@ -1349,8 +1348,8 @@ const { id } = useParams();
                 onClick={writeStudy}
                 disabled={isLoading || isStreaming}
                 className={`py-2 px-6 rounded-md font-medium text-white transition-colors ${isLoading || isStreaming
-                    ? 'bg-slate-400'
-                    : 'bg-slate-800 hover:bg-slate-700'
+                  ? 'bg-slate-400'
+                  : 'bg-slate-800 hover:bg-slate-700'
                   }`}
               >
                 {isLoading && !showStudy ? "Writing..." : "Write Short Study"}
@@ -1386,12 +1385,12 @@ const { id } = useParams();
               </div>
             ) : (
               <div className="bg-white p-8 rounded-lg border border-gray-200 mb-6">
-  <div className="max-w-3xl mx-auto">
-    <div className="prose prose-headings:font-serif prose-headings:text-slate-800 max-w-none">
-      <ReactMarkdown>{finalStudy}</ReactMarkdown>
-    </div>
-  </div>
-</div>
+                <div className="max-w-3xl mx-auto">
+                  <div className="prose prose-headings:font-serif prose-headings:text-slate-800 max-w-none">
+                    <ReactMarkdown>{finalStudy}</ReactMarkdown>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div className="flex justify-center space-x-4">
@@ -1426,10 +1425,10 @@ const { id } = useParams();
         )}
       </div>
       {showStudyDesign && (
-  <div className="max-w-5xl mx-auto">
-    {renderSaveButton()}
-  </div>
-)}
+        <div className="max-w-5xl mx-auto">
+          {renderSaveButton()}
+        </div>
+      )}
       {/* Elsevier-inspired footer */}
       <footer className="bg-slate-800 text-white py-6 mt-12">
         <div className="max-w-6xl mx-auto px-4">
@@ -1442,9 +1441,9 @@ const { id } = useParams();
               <p className="text-sm text-slate-300">&copy; {new Date().getFullYear()} All rights reserved</p>
             </div>
           </div>
-          
+
         </div>
-        
+
       </footer>
 
     </div>
